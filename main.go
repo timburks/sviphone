@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -18,6 +19,10 @@ var transforms map[string]string = map[string]string{}
 func run() error {
 	err := filepath.WalkDir("events", func(path string, d os.DirEntry, err error) error {
 		if strings.HasPrefix(path, "events/20") && !d.IsDir() {
+			err = removelinks(path)
+			if err != nil {
+				return err
+			}
 			err = process(path)
 			if err != nil {
 				return err
@@ -30,6 +35,10 @@ func run() error {
 	}
 	err = filepath.WalkDir("photos", func(path string, d os.DirEntry, err error) error {
 		if strings.HasPrefix(path, "photos/20") && !d.IsDir() {
+			err = removelinks(path)
+			if err != nil {
+				return err
+			}
 			err = process(path)
 			if err != nil {
 				return err
@@ -41,6 +50,7 @@ func run() error {
 		return err
 	}
 	//log.Printf("%+v", transforms)
+
 	{
 		b, err := os.ReadFile("events/events.html")
 		if err != nil {
@@ -51,6 +61,7 @@ func run() error {
 			s = strings.ReplaceAll(s, k, v)
 		}
 		os.WriteFile("events.html", []byte(s), 0644)
+		removelinks("events.html")
 	}
 	{
 		b, err := os.ReadFile("photos/photos.html")
@@ -62,6 +73,7 @@ func run() error {
 			s = strings.ReplaceAll(s, k, v)
 		}
 		os.WriteFile("photos.html", []byte(s), 0644)
+		removelinks("photos.html")
 	}
 	return err
 }
@@ -77,4 +89,17 @@ func process(path string) error {
 	//log.Printf("%s", url)
 	transforms[url] = path
 	return nil
+}
+
+func removelinks(filename string) error {
+	var re1 = regexp.MustCompile(`href=http`)
+	var re2 = regexp.MustCompile(`href="http`)
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	s := string(b)
+	s = re1.ReplaceAllString(s, `ignore=`)
+	s = re2.ReplaceAllString(s, `ignore="`)
+	return os.WriteFile(filename, []byte(s), 0644)
 }
